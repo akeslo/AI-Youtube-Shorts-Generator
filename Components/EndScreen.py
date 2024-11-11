@@ -71,62 +71,42 @@ def select_endscreen_template():
         return str(Path("templates/end") / templates[0])
 
 def add_endscreen(video_path, output_path, max_duration=60.0):
+    template_path = select_endscreen_template()
+    if not template_path:
+        print("No endscreen template selected, skipping...")
+        return False
+
     try:
-        # Prompt for template selection
-        template_path = select_endscreen_template()
-        if not template_path:
-            print("No endscreen template selected, skipping...")
-            return False
+        with VideoFileClip(video_path) as main_video, \
+             VideoFileClip(template_path) as endscreen:
+            
+            # Check duration
+            if main_video.duration + endscreen.duration > max_duration:
+                print(f"Cannot add endscreen: Total duration would exceed {max_duration} seconds")
+                return False
 
-        # Load the main video
-        main_video = VideoFileClip(video_path)
+            # Resize endscreen to match main video dimensions
+            endscreen_resized = endscreen.resize(main_video.size)
 
-        # Load the endscreen template
-        endscreen = VideoFileClip(template_path)
+            # Combine the videos
+            final_video = CompositeVideoClip([
+                main_video,
+                endscreen_resized.set_start(main_video.duration)
+            ])
 
-        # Check if adding endscreen would exceed max duration
-        if main_video.duration + endscreen.duration > max_duration:
-            print(f"Cannot add endscreen: Total duration would exceed {max_duration} seconds")
-            main_video.close()
-            endscreen.close()
-            return False
+            # Write the final video
+            final_video.write_videofile(
+                output_path,
+                codec='libx264',
+                audio_codec='aac',
+                temp_audiofile='temp-audio.m4a',
+                remove_temp=True
+            )
 
-        # Resize endscreen to match main video dimensions
-        endscreen_resized = endscreen.resize(main_video.size)
+            # Clean up final video
+            final_video.close()
 
-        # Combine the videos
-        final_video = CompositeVideoClip([
-            main_video,
-            endscreen_resized.set_start(main_video.duration)
-        ])
-
-        # Write the final video
-        final_video.write_videofile(
-            output_path,
-            codec='libx264',
-            audio_codec='aac',
-            temp_audiofile='temp-audio.m4a',
-            remove_temp=True
-        )
-
-        # Clean up
-        main_video.reader.close()
-        if main_video.audio:
-            main_video.audio.reader.close_proc()
-
-        endscreen.reader.close()
-        if endscreen.audio:
-            endscreen.audio.reader.close_proc()
-
-        final_video.reader.close()
-        if final_video.audio:
-            final_video.audio.reader.close_proc()
-
-        main_video.close()
-        endscreen.close()
-        final_video.close()
-
-        return True
+            return True
 
     except Exception as e:
         print(f"Error adding endscreen: {str(e)}")
@@ -143,10 +123,8 @@ def check_duration(video_path):
         float: Duration of the video in seconds
     """
     try:
-        video = VideoFileClip(video_path)
-        duration = video.duration
-        video.close()
-        return duration
+        with VideoFileClip(video_path) as video:
+            return video.duration
     except Exception as e:
         print(f"Error checking video duration: {str(e)}")
         return None

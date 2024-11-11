@@ -52,7 +52,7 @@ def main():
                     else:
                         console.log("[red]Unexpected transcription format[/red]")
 
-                segments = getSegments(transcriptions, num_clips=1)
+                segments = getSegments(transcriptions, num_clips=5)
                 
                 if segments:
                     console.log(f"[blue]Creating shorts for segments:[/blue] {segments}")
